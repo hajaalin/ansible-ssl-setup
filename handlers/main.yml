@@ -1,0 +1,21 @@
+---
+  - name: edit certificate key path in Apache config
+    lineinfile:
+      dest: "{{ apache_conf_path }}/{{ apache_vhosts_filename }}"
+      regexp: ^SSLCertificateKeyFile
+      line: SSLCertificateKeyFile {{ ssl_certificate_key_file }}
+
+  - name: edit certificate path in Apache config
+    lineinfile:
+      dest: "{{ apache_conf_path }}/{{ apache_vhosts_filename }}"
+      regexp: ^SSLCertificateFile
+      line: SSLCertificateFile {{ ssl_certificate_file }}
+
+  - name: edit certificate chain path in Apache config
+    lineinfile:
+      dest: "{{ apache_conf_path }}/{{ apache_vhosts_filename }}"
+      regexp: ^SSLCertificateChainFile
+      line: SSLCertificateChainFile {{ ssl_certificate_chain_file }}
+
+  - name: restart Apache
+    service: name={{ apache_daemon }} state=restarted

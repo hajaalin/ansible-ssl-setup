@@ -1,0 +1,58 @@
+---
+
+- name: create directories for SSL keys
+  file: path={{ ssl_certificate_key_dir }} mode=0700 state=directory
+
+- name: create directories for SSL certificates
+  file: path={{ ssl_certificate_dir }} mode=0755 state=directory
+
+
+# 1. key and csr creation
+- name: create key and csr
+  command: openssl req -new -sha256 -newkey rsa:4096 -nodes -subj "{{ ssl_certificate_subject }}" -days 365 -keyout "{{ ssl_certificate_key_file }}" -out {{ ssl_certificate_signing_request_file }}
+  args:
+    creates: "{{ ssl_certificate_key_file }}"
+  register: sslkey
+  notify:
+    - edit certificate key path in Apache config
+    - restart httpd
+
+- name: change permissions of key file
+  file: path={{ ssl_certificate_key_file }} mode=0600
+
+- name: change permissions of csr file
+  file: path={{ ssl_certificate_signing_request_file }} mode=0644
+
+
+# 2. self-signed certificate
+- name: create self-signed certificate
+  command: openssl req -new -x509 -sha256 -subj "{{ ssl_certificate_subject }}" -days 365 -key "{{ ssl_certificate_key_file }}" -out {{ ssl_certificate_file }} -extensions v3_ca
+  when: sslkey.changed
+  notify:
+    - edit certificate path in Apache config
+    - restart httpd
+
+- name: copy self-signed certificate to certificate chain
+  command: cp "{{ ssl_certificate_file }}" "{{ ssl_certificate_chain_file }}"
+  when: sslkey.changed
+  notify:
+    - edit certificate chain path in Apache config
+    - restart httpd
+
+
+# 3. real certificate and chain received
+- name: copy SSL certificate
+  copy: src={{ ssl_certificate_file_src }} dest={{ ssl_certificate_file }}
+  when: ssl_certificate_file_src is defined and
+        ssl_certificate_chain_file_src is defined
+  notify:
+    - edit certificate path in Apache config
+    - restart httpd
+
+- name: copy SSL certificate chain
+  copy: src={{ ssl_certificate_chain_file_src }} dest={{ ssl_certificate_chain_file }}
+  when: ssl_certificate_file_src is defined and
+        ssl_certificate_chain_file_src is defined
+  notify:
+    - edit certificate chain path in Apache config
+    - restart httpd
