@@ -13,9 +13,6 @@
   args:
     creates: "{{ ssl_certificate_key_file }}"
   register: sslkey
-  notify:
-    - edit certificate key path in Apache config
-    - restart httpd
 
 - name: change permissions of key file
   file: path={{ ssl_certificate_key_file }} mode=0600
@@ -28,16 +25,10 @@
 - name: create self-signed certificate
   command: openssl req -new -x509 -sha256 -subj "{{ ssl_certificate_subject }}" -days 365 -key "{{ ssl_certificate_key_file }}" -out {{ ssl_certificate_file }} -extensions v3_ca
   when: sslkey.changed
-  notify:
-    - edit certificate path in Apache config
-    - restart httpd
 
 - name: copy self-signed certificate to certificate chain
   command: cp "{{ ssl_certificate_file }}" "{{ ssl_certificate_chain_file }}"
   when: sslkey.changed
-  notify:
-    - edit certificate chain path in Apache config
-    - restart httpd
 
 
 # 3. real certificate and chain received
@@ -46,13 +37,47 @@
   when: ssl_certificate_file_src is defined and
         ssl_certificate_chain_file_src is defined
   notify:
-    - edit certificate path in Apache config
     - restart httpd
 
 - name: copy SSL certificate chain
-  copy: src={{ ssl_certificate_chain_file_src }} dest={{ ssl_certificate_chain_file }}
+  copy: src={{ ssl_certificate_chain_file_src }} dest={{ ssl_certificate_chain_file }}
   when: ssl_certificate_file_src is defined and
         ssl_certificate_chain_file_src is defined
   notify:
-    - edit certificate chain path in Apache config
+    - restart httpd
+
+
+# 4. edit Apache configuration
+- name: make a copy of Apache virtual host configuration
+  command: cp "{{ apache_conf_path }}/{{ apache_vhosts_filename }}" "{{ apache_conf_path }}/{{ apache_vhosts_filename }}.orig"
+  args:
+    creates: "{{ apache_conf_path }}/{{ apache_vhosts_filename }}.orig"
+  register: orig_config
+
+- name: remove comments from Apache virtual host configuration
+  command: sed -i '/^#/d' "{{ apache_conf_path }}/{{ apache_vhosts_filename }}"
+  when: orig_config.changed
+
+- name: edit certificate key path in Apache config
+  lineinfile:
+    dest: "{{ apache_conf_path }}/{{ apache_vhosts_filename }}"
+    regexp: ^SSLCertificateKeyFile
+    line: SSLCertificateKeyFile {{ ssl_certificate_key_file }}
+  notify:
+    - restart httpd
+
+- name: edit certificate path in Apache config
+  lineinfile:
+    dest: "{{ apache_conf_path }}/{{ apache_vhosts_filename }}"
+    regexp: ^SSLCertificateFile
+    line: SSLCertificateFile {{ ssl_certificate_file }}
+  notify:
+    - restart httpd
+
+- name: edit certificate chain path in Apache config
+  lineinfile:
+    dest: "{{ apache_conf_path }}/{{ apache_vhosts_filename }}"
+    insertafter: ^SSLCertificateFile
+    line: SSLCertificateChainFile {{ ssl_certificate_chain_file }}
+  notify:
     - restart httpd
