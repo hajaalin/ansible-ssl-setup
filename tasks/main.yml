@@ -81,3 +81,8 @@
     line: SSLCertificateChainFile {{ ssl_certificate_chain_file }}
   notify:
     - restart httpd
+
+- name: redirect HTTP to HTTPS
+  template: src=redirect.conf dest="{{ apache_conf_path }}/redirect.conf"
+  notify:
+    - restart httpd
