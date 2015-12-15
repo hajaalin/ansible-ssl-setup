@@ -63,6 +63,7 @@
     dest: "{{ apache_conf_path }}/{{ apache_vhosts_filename }}"
     regexp: ^SSLCertificateKeyFile
     line: SSLCertificateKeyFile {{ ssl_certificate_key_file }}
+  when: orig_config.changed
   notify:
     - restart httpd
 
@@ -71,6 +72,7 @@
     dest: "{{ apache_conf_path }}/{{ apache_vhosts_filename }}"
     regexp: ^SSLCertificateFile
     line: SSLCertificateFile {{ ssl_certificate_file }}
+  when: orig_config.changed
   notify:
     - restart httpd
 
@@ -79,6 +81,7 @@
     dest: "{{ apache_conf_path }}/{{ apache_vhosts_filename }}"
     insertafter: ^SSLCertificateFile
     line: SSLCertificateChainFile {{ ssl_certificate_chain_file }}
+  when: orig_config.changed
   notify:
     - restart httpd
 
